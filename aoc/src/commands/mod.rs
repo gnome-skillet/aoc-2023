@@ -1,4 +1,4 @@
-pub mod day5;
+pub mod day1;
 
 use std::error::Error;
 
