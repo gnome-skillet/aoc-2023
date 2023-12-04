@@ -102,7 +102,8 @@ fn parse_game(input: &str) -> IResult<&str, u32> {
     let score = hash_set::intersection(vec![winning_numbers, numbers]);
     let nmatches: u32 = score.len() as u32;
 
-    Ok((input, nmatches))
+    let updated_score: u32 = if nmatches == 0 { 0u32 } else { 2u32.pow(nmatches - 1) };
+    Ok((input, updated_score))
 }
 
 fn parse_games(input: &str) -> IResult<&str, Vec<u32>> {
@@ -115,21 +116,8 @@ impl CommandImpl for Day4 {
         let string = read_to_string(&self.input).unwrap();
         let (input, games) = parse_games(&string).unwrap();
         println!("games: {games:?}");
-        let mut copies: Vec<u32> = vec![1u32; games.len()];
-        for (i,nmatches) in games.iter().enumerate() {
-            if *nmatches > 0u32 {
-                let last_card = if (i + *nmatches as usize) < games.len() {
-                    i + (nmatches + 1) as usize 
-                } else {
-                    games.len()
-                };
-                for j in (i+1..last_card) {
-                    copies[j] += copies[i];
-                }
-            }
-        }
-        let ncards: u32 = copies.iter().sum();
-        println!("ncards: {ncards}");
+        let score: u32 = games.iter().sum();
+        println!("score: {score}");
 
         Ok(())
     }

@@ -33,12 +33,6 @@ pub enum Cube {
 
 impl Cube {
     pub fn new(number: u32, color: &str) -> Cube {
-        match color {
-            "red" => Cube::Red(number),
-            "green" => Cube::Green(number),
-            "blue" => Cube::Blue(number),
-            _ => panic!(),
-        }
     }
 }
 
@@ -49,52 +43,6 @@ pub struct Bag {
 
 impl Bag {
     pub fn new(cubes: Vec<Cube>) -> Self {
-        let mut colored_cubes: HashMap<String, u32> = HashMap::new();
-        for cube in cubes {
-            match cube {
-                Cube::Red(x) => {
-                    colored_cubes.insert("red".to_string(), x);
-                }
-                Cube::Blue(x) => {
-                    colored_cubes.insert("blue".to_string(), x);
-                }
-                Cube::Green(x) => {
-                    colored_cubes.insert("green".to_string(), x);
-                }
-            }
-        }
-        Bag { colored_cubes }
-    }
-
-    pub fn contains(&self, other: &Bag) -> bool {
-        for (color, count) in other.colored_cubes.iter() {
-            if self.colored_cubes.contains_key(&*color) {
-                let this_count = self.colored_cubes.get(&*color).unwrap();
-                if count > this_count {
-                    return false;
-                }
-            } else {
-                return false;
-            }
-        }
-        true
-    }
-
-    pub fn combine(&mut self, other: &Bag) -> &mut Self {
-        for (color, count) in other.colored_cubes.iter() {
-            if self.colored_cubes.contains_key(&*color) {
-                let this_count = self.colored_cubes.get(&*color).unwrap();
-                if count <= this_count {
-                    continue;
-                }
-            }
-            self.colored_cubes.insert(color.to_string(), *count);
-        }
-        self
-    }
-
-    pub fn powerset(&self) -> u32 {
-        self.colored_cubes.values().product()
     }
 }
 
@@ -126,8 +74,6 @@ fn parse_games(input: &str) -> IResult<&str, Vec<Vec<Bag>>> {
 
 impl CommandImpl for Day2 {
     fn main(&self) -> Result<(), DynError> {
-        //let file = File::open(&self.input)?;
-        //let reader = BufReader::new(file);
         let string = read_to_string(&self.input).unwrap();
         let (input, games) = parse_games(&string).unwrap();
         let cubes: Vec<Cube> = vec![Cube::Red(12), Cube::Blue(14), Cube::Green(13)];
@@ -174,20 +120,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_cube() {
-        let x: String = "6 green".to_string();
-        let input: &str = &x;
-        let (input, actual) = parse_cube(input).unwrap();
-        let expected: Cube = Cube::new(6u32, "green");
-        assert_eq!(actual, expected);
-        let x: String = "4 red".to_string();
-        let input: &str = &x;
-        let (input, actual) = parse_cube(input).unwrap();
-        let expected: Cube = Cube::new(4u32, "red");
-        assert_eq!(actual, expected);
-    }
-
-    #[test]
     fn test_parse_cubes() {
         let x: String = "6 green, 4 red".to_string();
         let input: &str = &x;
@@ -196,26 +128,5 @@ mod tests {
         let red: Cube = Cube::new(4u32, "red");
         let expected: Bag = Bag::new(vec![green, red]);
         assert_eq!(actual, expected);
-    }
-
-    #[test]
-    fn test_game() {
-        let x: String = "Game 1: 3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green".to_string();
-        let input: &str = &x;
-        let (input, actual) = parse_game(input).unwrap();
-
-        let blue1: Cube = Cube::new(3u32, "blue");
-        let red1: Cube = Cube::new(4u32, "red");
-        let red2: Cube = Cube::new(1u32, "red");
-        let green2: Cube = Cube::new(2u32, "green");
-        let blue2: Cube = Cube::new(6u32, "blue");
-        let green3: Cube = Cube::new(2u32, "green");
-
-        let expected: Bag = Bag::new(vec![blue1, red1]);
-        assert_eq!(actual[0], expected);
-        let expected: Bag = Bag::new(vec![red2, green2, blue2]);
-        assert_eq!(actual[1], expected);
-        let expected: Bag = Bag::new(vec![green3]);
-        assert_eq!(actual[2], expected);
     }
 }
