@@ -132,16 +132,17 @@ impl CommandImpl for Day2 {
         let (input, games) = parse_games(&string).unwrap();
         let cubes: Vec<Cube> = vec![Cube::Red(12), Cube::Blue(14), Cube::Green(13)];
         let bag: Bag = Bag::new(cubes);
+        println!("{bag:#?}");
         let mut vec: Vec<u32> = Vec::new();
         for (i, game) in games.iter().enumerate() {
             let mut doit: bool = true;
             for draw in game {
                 if !bag.contains(&draw) {
-                    println!("game ({i}): draw: {draw:?} is bigger than bag: {bag:?}");
+                    println!("uncontained ({i}): {draw:#?}");
                     doit = false;
                     break;
                 } else {
-                    println!("game ({i}): draw: {draw:?} is contained in bag: {bag:?}");
+                    println!("contained ({i}): {draw:#?}");
                 }
             }
             if doit {
