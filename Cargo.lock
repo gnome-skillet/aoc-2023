@@ -67,6 +67,7 @@ dependencies = [
  "csv",
  "enum_dispatch",
  "glam",
+ "hash-set",
  "intersection",
  "itertools",
  "nom",
@@ -167,6 +168,12 @@ name = "glam"
 version = "0.24.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5418c17512bdf42730f9032c74e1ae39afc408745ebb2acf72fbc4691c17945"
+
+[[package]]
+name = "hash-set"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b6a346c72e42e68d596efb409fbd1e77eb10df6f6f5eb4c877ace244a36185a"
 
 [[package]]
 name = "heck"
