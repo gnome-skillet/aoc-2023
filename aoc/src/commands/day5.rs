@@ -13,7 +13,7 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, take_until},
     character::complete::{alpha0, alphanumeric1, digit1, newline, space0, space1, u32},
-    multi::{many1, separated_list1},
+    multi::{many0, separated_list1},
     sequence::{delimited, preceded, separated_pair},
     IResult,
 };
@@ -87,55 +87,31 @@ fn parse_almanac2(input: &str) -> IResult<&str, usize> {
     let (input, seeds) = parse_seeds(input)?;
     let mut seeds: Vec<InclusiveRange> = get_seeds(seeds);
 
-    let (input, _) = newline(input)?;
-    let (input, _) = newline(input)?;
-    let (input, _) = tag("seed-to-soil map:")(input)?;
-    let (input, _) = newline(input)?;
-    let (input, seed_to_soil) = parse_map(input)?;
-    println!("seed_to_soil: {seed_to_soil:#?}");
-    let (input, _) = newline(input)?;
-    let (input, _) = newline(input)?;
-    let (input, _) = tag("soil-to-fertilizer map:")(input)?;
-    let (input, _) = newline(input)?;
-    let (input, soil_to_fertilizer) = parse_map(input)?;
-    let (input, _) = newline(input)?;
-    let (input, _) = newline(input)?;
+    let tags: Vec<String> = vec![
+        "seed-to-soil map:".to_owned(),
+        "soil-to-fertilizer map:".to_owned(),
+        "fertilizer-to-water map:".to_owned(),
+        "water-to-light map:".to_owned(),
+        "light-to-temperature map:".to_owned(),
+        "temperature-to-humidity map:".to_owned(),
+        "humidity-to-location map:".to_owned()
+    ];
 
-    let (input, _) = tag("fertilizer-to-water map:")(input)?;
-    let (input, _) = newline(input)?;
-    let (input, fertilizer_to_water) = parse_map(input)?;
-    let (input, _) = newline(input)?;
-    let (input, _) = newline(input)?;
-    //let numbers: HashSet<u32> = keep(&numbers,fertilizer_to_water);
+    let mut maps: Vec<Vec<InclusiveRange>> = vec![];
+    for mytag in tags.iter() {
+        let (input, _) = many0(newline)(input)?;
+        let (input, _) = take_until(":")(input)?;
+        let (input, _) = tag(":")(input)?;
+        let (input, _) = many0(newline)(input)?;
+        let (input, mut seed_to_soil) = parse_map(input)?;
+        let (input, _) = many0(newline)(input)?;
+        println!("parse {mytag:?}");
+        maps.push(seed_to_soil);
+    }
 
-    //let seed_to_soil: HashMap<u32,u32> = HashMap::new();
+    for mapping in maps {
+    }
 
-    let (input, _) = tag("water-to-light map:")(input)?;
-    let (input, _) = newline(input)?;
-    let (input, water_to_light) = parse_map(input)?;
-    let (input, _) = newline(input)?;
-    let (input, _) = newline(input)?;
-    //let numbers: HashSet<u32> = keep(&numbers,water_to_light);
-
-    let (input, _) = tag("light-to-temperature map:")(input)?;
-    let (input, _) = newline(input)?;
-    let (input, light_to_temp) = parse_map(input)?;
-    let (input, _) = newline(input)?;
-    let (input, _) = newline(input)?;
-    //let numbers: HashSet<u32> = keep(&numbers,light_to_temp);
-
-    let (input, _) = tag("temperature-to-humidity map:")(input)?;
-    let (input, _) = newline(input)?;
-    let (input, temp_to_humidity) = parse_map(input)?;
-    let (input, _) = newline(input)?;
-    let (input, _) = newline(input)?;
-    //let numbers: HashSet<u32> = keep(&numbers,temp_to_humidity);
-
-    let (input, _) = tag("humidity-to-location map:")(input)?;
-    let (input, _) = newline(input)?;
-    let (input, humidity_to_location) = parse_map(input)?;
-    //let numbers: HashSet<u32> = keep(&numbers,humidity_to_location);
-    //let min = numbers.iter().min().unwrap();
     let min: usize = 0;
 
     Ok((input, min))
@@ -144,13 +120,38 @@ fn parse_almanac2(input: &str) -> IResult<&str, usize> {
 #[derive(Debug, Default, Eq)]
 pub struct InclusiveRange {
     start: usize,
-    length: usize,
-    projection: usize,
+    end: usize,
+    projection: Option<usize>,
+}
+
+enum Projection {
+    Add(usize),
+    Subtract(usize),
+    None
+}
+
+impl Projection {
+    pub fn project(&self, range: InclusiveRange) -> InclusiveRange {
+        match(self) {
+            Add(x) => range.add(x),
+            Subtract(x) => range.subtract(x),
+            None => range.clone(),
+        }
+    }
 }
 
 impl InclusiveRange {
-    pub fn new(start: usize, length: usize, projection: usize) -> Self {
-        InclusiveRange { start, length, projection }
+    pub fn new(start: usize, length: usize) -> Self {
+        InclusiveRange {
+            start, 
+            end: start + length,
+            ..Default::default()
+        }
+    }
+
+    pub fn (mut self, projection: usize) -> Self {
+        self.projection = projection;
+        self
     }
 
     pub fn offset(&self, other_start: usize) -> (i8, usize) {
@@ -183,9 +184,9 @@ impl InclusiveRange {
         }
 
         let start: usize = if self.start < other.start { self.start } else { other.start };
-        let length: usize =
-            if self.end() > other.end() { self.end() - start + 1 } else { other.end() - start + 1 };
-        Some(InclusiveRange::new(start, length, self.projection))
+        let end: usize =
+            if self.end > other.end { self.end } else { other.end };
+        Some(InclusiveRange::new(start, end, self.projection))
     }
 
     pub fn end(&self) -> usize {
