@@ -94,7 +94,7 @@ fn parse_almanac2(input: &str) -> IResult<&str, usize> {
         "water-to-light map:".to_owned(),
         "light-to-temperature map:".to_owned(),
         "temperature-to-humidity map:".to_owned(),
-        "humidity-to-location map:".to_owned()
+        "humidity-to-location map:".to_owned(),
     ];
 
     let mut maps: Vec<Vec<InclusiveRange>> = vec![];
@@ -109,8 +109,7 @@ fn parse_almanac2(input: &str) -> IResult<&str, usize> {
         maps.push(seed_to_soil);
     }
 
-    for mapping in maps {
-    }
+    for mapping in maps {}
 
     let min: usize = 0;
 
@@ -121,112 +120,90 @@ fn parse_almanac2(input: &str) -> IResult<&str, usize> {
 pub struct InclusiveRange {
     start: usize,
     end: usize,
-    projection: Option<usize>,
+    projection: Projection,
 }
 
 enum Projection {
     Add(usize),
     Subtract(usize),
-    None
+    None,
 }
 
-impl Projection {
-    pub fn project(&self, range: InclusiveRange) -> InclusiveRange {
-        match(self) {
-            Add(x) => range.add(x),
-            Subtract(x) => range.subtract(x),
-            None => range.clone(),
-        }
+impl Default for Projection {
+    fn default() -> Self {
+        Projection::None
     }
 }
 
 impl InclusiveRange {
-    pub fn new(start: usize, length: usize) -> Self {
-        InclusiveRange {
-            start, 
-            end: start + length,
-            ..Default::default()
-        }
+    fn new(start: usize, length: usize) -> Self {
+        Self { start, end: start + length, ..Default::default() }
     }
 
-    pub fn (mut self, projection: usize) -> Self {
-        self.projection = projection;
+    pub fn set_addition(&mut self, projection: usize) -> &mut Self {
+        self.projection = Projection::Add(projection);
         self
     }
 
-    pub fn offset(&self, other_start: usize) -> (i8, usize) {
-        let sign = if self.start > other_start { 1i8 } else { -1i8 };
-        (sign, self.start.abs_diff(other_start))
+    pub fn set_subtraction(&mut self, projection: usize) -> &mut Self {
+        self.projection = Projection::Subtract(projection);
+        self
     }
 
-    pub fn mapit(&self, mappy: (i8, usize)) -> Self {
-        let newstart = if mappy.0 > 0 { self.start + mappy.1 } else { self.start - mappy.1 };
-        InclusiveRange::new(newstart, self.length, self.projection)
+    pub fn project(&mut self) -> &mut Self {
+        match self.projection {
+            Projection::Add(x) => {
+                self.start += x;
+                self.end += x;
+            }
+            Projection::Subtract(x) => {
+                self.start -= x;
+                self.end -= x;
+            }
+            Projection::None => {}
+        };
+        self.projection = Projection::None;
+        self
     }
 
     // check if there is an overlap between self and other
     pub fn overlaps(&self, other: &Self) -> bool {
-        let end_of_self: usize = self.start + self.length - 1;
-        let end_of_other: usize = other.start + other.length - 1;
-        end_of_self >= other.start && end_of_other >= self.start
-    }
-
-    // check if self contains other
-    pub fn contains(&self, other: &Self) -> bool {
-        let end_of_self: usize = self.start + self.length - 1;
-        let end_of_other: usize = other.start + other.length - 1;
-        self.start <= other.start && end_of_other <= end_of_self
-    }
-
-    pub fn coalesce(&self, other: &Self) -> Option<Self> {
-        if !self.overlaps(other) {
-            return None;
-        }
-
-        let start: usize = if self.start < other.start { self.start } else { other.start };
-        let end: usize =
-            if self.end > other.end { self.end } else { other.end };
-        Some(InclusiveRange::new(start, end, self.projection))
-    }
-
-    pub fn end(&self) -> usize {
-        self.start + self.length - 1
+        self.start < other.end && other.start < self.end
     }
 
     // return portion of self that doesn't overlap with other
-    pub fn disjunction(&self, other: &Self) -> Option<Vec<Self>> {
-        if self.contains(other) && other.contains(self) {
-            return None;
+    pub fn lower_disjunction(&self, other: &Self) -> Option<Self> {
+        if self.overlaps(other) && self.start < other.start {
+            Some(InclusiveRange::new(self.start, other.start))
+        } else {
+            None
         }
-        let mut nonoverlap: Vec<InclusiveRange> = Vec::new();
-        if self.start < other.start {
-            let newrange: InclusiveRange =
-                InclusiveRange::new(self.start, other.start - self.start, self.projection);
-            nonoverlap.push(newrange);
-        }
-        if self.end() > other.end() {
-            let newrange: InclusiveRange =
-                InclusiveRange::new(other.end() + 1, self.end(), self.projection);
-            nonoverlap.push(newrange);
-        }
-        Some(nonoverlap)
     }
 
-    // return portion of self that overlaps with other
-    pub fn overlap(&self, other: &Self) -> Option<Self> {
-        if !self.overlaps(other) {
-            return None;
-        }
-
-        let end_of_self: usize = self.start + self.length - 1;
-        let end_of_other: usize = other.start + other.length - 1;
-        let start_of_overlap = if self.start >= other.start { self.start } else { other.start };
-        let length_of_overlap = if end_of_self <= end_of_other {
-            end_of_self - start_of_overlap + 1
+    // return portion of self that doesn't overlap with other
+    pub fn upper_disjunction(&self, other: &Self) -> Option<Self> {
+        if self.overlaps(other) && self.end > other.end {
+            Some(InclusiveRange::new(other.end + 1, self.end))
         } else {
-            end_of_other - start_of_overlap + 1
-        };
-        Some(InclusiveRange::new(start_of_overlap, length_of_overlap, self.projection))
+            None
+        }
+    }
+
+    // map intersecting portion of other
+    pub fn conjunction(&self, other: &Self) -> Option<Self> {
+        if self.overlaps(other) {
+            let start: usize = if self.start >= other.start { self.start } else { other.start };
+            let end: usize = if self.end <= other.end { self.end } else { other.end };
+            let mut conjunction: InclusiveRange = InclusiveRange::new(start, end);
+            let &mut conjunction = match self.projection {
+                Projection::Add(x) => conjunction.set_addition(x).project(),
+                Projection::Subtract(x) => conjunction.set_subtraction(x).project(),
+                Projection::None => &mut conjunction,
+            };
+            Some(conjunction)
+        } else {
+            None
+        }
     }
 }
 
@@ -244,7 +221,7 @@ impl PartialOrd for InclusiveRange {
 
 impl PartialEq for InclusiveRange {
     fn eq(&self, other: &Self) -> bool {
-        self.start == other.start && self.length == other.length
+        self.start == other.start && self.end == other.end
     }
 }
 
