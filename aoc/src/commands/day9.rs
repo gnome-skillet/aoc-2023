@@ -9,7 +9,7 @@ use std::fs::read_to_string;
 use intersection::hash_set;
 use nom::{
     bytes::complete::tag,
-    character::complete::{alphanumeric1, newline},
+    character::complete::{alphanumeric1, i32, newline, space1},
     multi::separated_list1,
     sequence::separated_pair,
     IResult,
@@ -23,111 +23,99 @@ pub struct Day9 {
     input: PathBuf,
 }
 
-fn parse_tuple(input: &str) -> IResult<&str, (&str, &str)> {
-    let (input, v) = separated_pair(alphanumeric1, tag(", "), alphanumeric1)(input)?;
-    Ok((input, (v.0, v.1)))
+fn parse_sequence(input: &str) -> IResult<&str, Vec<i32>> {
+    let (input, sequence) = separated_list1(space1, i32)(input)?;
+    Ok((input, sequence))
 }
 
-fn parse_lookup(input: &str) -> IResult<&str, (&str, (&str, &str))> {
-    let (input, source) = alphanumeric1(input)?;
-    let (input, _) = tag(" = ")(input)?;
-    let (input, _) = tag("(")(input)?;
-    let (input, left_right) = parse_tuple(input)?;
-    let (input, _) = tag(")")(input)?;
-    Ok((input, (source, left_right)))
+fn parse_sequences(input: &str) -> IResult<&str, Vec<Vec<i32>>> {
+    let (input, sequences) = separated_list1(newline, parse_sequence)(input)?;
+
+    Ok((input, sequences))
 }
 
-fn parse_lookups(input: &str) -> IResult<&str, Vec<(&str, (&str, &str))>> {
-    let (input, lookups) = separated_list1(newline, parse_lookup)(input)?;
-    Ok((input, lookups))
+pub fn differences(slice: &[i32]) -> Vec<i32> {
+    let diffs: Vec<i32> = slice.windows(2).map(|w| w[1] - w[0]).collect::<Vec<i32>>();
+    diffs
 }
 
-fn parse_router(input: &str) -> IResult<&str, (&str, Router)> {
-    let (input, steps) = alphanumeric1(input)?;
-    let (input, _) = newline(input)?;
-    let (input, _) = newline(input)?;
-    let (input, lookups) = parse_lookups(input)?;
-    let mapping: Router = Router::new(lookups);
-
-    Ok((input, (steps, mapping)))
-}
-
-fn lcm(first: usize, second: usize) -> usize {
-    first * second / gcd(first, second)
-}
-
-fn gcd(first: usize, second: usize) -> usize {
-    let mut max = first;
-    let mut min = second;
-    if min > max {
-        std::mem::swap(&mut max, &mut min);
-    }
-
+pub fn get_differences(sequence: &Vec<i32>) -> Vec<Vec<i32>> {
+    let mut diffs: Vec<Vec<i32>> = Vec::new();
+    let mut curr: Vec<i32> = sequence.to_vec();
     loop {
-        let res = max % min;
-        if res == 0 {
-            return min;
+        let mut sum: i32 = 0;
+        for s in curr.iter() {
+            sum += s;
         }
-
-        (max, min) = (min, res);
-        //max = min;
-        //min = res;
+        let diff: Vec<i32> = differences(&curr);
+        diffs.push(curr);
+        if sum == 0 {
+            break;
+        }
+        curr = diff;
     }
+    diffs
 }
 
-pub struct Router<'a> {
-    route: HashMap<&'a str, (&'a str, &'a str)>,
+pub fn evaluate_rhs(sequences: Vec<Vec<i32>>) -> i32 {
+    let mut carry_over: i32 = 0i32;
+    let mut i: usize = sequences.len();
+    let mut vecs: Vec<i32> = Vec::new();
+    while i != 0 {
+        carry_over = sequences[i - 1].last().unwrap() + carry_over;
+        vecs.push(carry_over);
+        i -= 1;
+    }
+    let last_value: i32 = *vecs.last().unwrap();
+    last_value
 }
 
-impl<'a> Router<'a> {
-    pub fn new(router: Vec<(&'a str, (&'a str, &'a str))>) -> Self {
-        let mut route: HashMap<&str, (&str, &str)> = HashMap::new();
-        for step in router {
-            route.insert(step.0, step.1);
-        }
-        Router { route }
+pub fn evaluate_lhs(sequences: Vec<Vec<i32>>) -> i32 {
+    let mut carry_over: i32 = 0i32;
+    let mut i: usize = sequences.len();
+    let mut vecs: Vec<i32> = Vec::new();
+    while i != 0 {
+        carry_over = sequences[i - 1][0] - carry_over;
+        vecs.push(carry_over);
+        i -= 1;
     }
+    let last_value: i32 = *vecs.last().unwrap();
+    last_value
+}
 
-    pub fn traverse(&self, origin: &str, destination: char, path: &str) -> usize {
-        let mut nsteps: usize = 0;
-        let mut location: &str = origin;
-        for c in path.chars().cycle() {
-            if location.ends_with(destination) {
-                break;
-            }
-            nsteps += 1;
-            let fork: &(&str, &str) = self.route.get(location).unwrap();
-            location = if c == 'L' { fork.0 } else { fork.1 };
-        }
-        nsteps
+pub fn solve_parta(sequences: Vec<Vec<i32>>) -> i32 {
+    let mut results: Vec<i32> = Vec::new();
+    for seq in sequences.iter() {
+        let differences: Vec<Vec<i32>> = get_differences(&seq);
+        //println!("differences: {differences:#?}");
+        let evaluation: i32 = evaluate_rhs(differences);
+        results.push(evaluation);
+        println!("evaluation: {evaluation:#?}");
     }
+    results.iter().sum()
+}
 
-    pub fn traverse_paths(&self, path: &str, origin: char, destination: char) -> Option<usize> {
-        //let mut steps = path.chars().cycle();
-        let mut locations: Vec<&str> = Vec::new();
-        for s in self.route.keys() {
-            if s.ends_with(origin) {
-                locations.push(s);
-            }
-        }
-        let mut distances: Vec<usize> = Vec::new();
-        for location in locations.iter() {
-            let distance: usize = self.traverse(location, 'Z', path);
-            distances.push(distance);
-        }
-
-        distances.into_iter().reduce(lcm)
+pub fn solve_partb(sequences: Vec<Vec<i32>>) -> i32 {
+    let mut results: Vec<i32> = Vec::new();
+    for seq in sequences.iter() {
+        let differences: Vec<Vec<i32>> = get_differences(&seq);
+        //println!("differences: {differences:#?}");
+        let evaluation: i32 = evaluate_lhs(differences);
+        results.push(evaluation);
+        println!("evaluation: {evaluation:#?}");
     }
+    results.iter().sum()
 }
 
 impl CommandImpl for Day9 {
     fn main(&self) -> Result<(), DynError> {
         let string = read_to_string(&self.input).unwrap();
-        let (_, (path, router)) = parse_router(&string).unwrap();
-        if let Some(distance) = router.traverse_paths(path, 'A', 'Z') {
-            println!("distance {distance:#?}");
-        };
-
+        let (_, sequences) = parse_sequences(&string).unwrap();
+        //println!("sequences {sequences:#?}");
+        //let solution: i32 = solve_parta(sequences);
+        //println!("solution a: {solution:#?}");
+        let solution: i32 = solve_partb(sequences);
+        println!("solution b: {solution:#?}");
         Ok(())
     }
 }
@@ -135,4 +123,13 @@ impl CommandImpl for Day9 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_range_overlaps() {
+        let this: Vec<i32> = vec![1, 2, 3, 5, 8, 13];
+        let expected: Vec<i32> = vec![1, 1, 2, 3, 5];
+        let actual: Vec<i32> = differences(&this);
+        assert_eq!(actual, expected);
+        assert_eq!(actual.len(), this.len() - 1);
+    }
 }
