@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 
 #[derive(Parser, Debug)]
-pub struct Day8 {
+pub struct Day9 {
     #[clap(long, short)]
     input: PathBuf,
 }
@@ -120,7 +120,7 @@ impl<'a> Router<'a> {
     }
 }
 
-impl CommandImpl for Day8 {
+impl CommandImpl for Day9 {
     fn main(&self) -> Result<(), DynError> {
         let string = read_to_string(&self.input).unwrap();
         let (_, (path, router)) = parse_router(&string).unwrap();
